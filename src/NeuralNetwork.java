@@ -9,8 +9,13 @@ public class NeuralNetwork implements Serializable {
     NeuralNetwork(int inputs, int hidden, int outputs) {
     }
 
-    public double getOutput(SensorModel a) {
-        return 0.5;
+    public double[] getOutput(SensorModel a) {
+        double[] action = new double[3];
+        action[0] = .5;
+        action[1] = .0;
+        action[2] = .0;
+
+        return action;
     }
 
     //Store the state of this neural network
@@ -27,6 +32,7 @@ public class NeuralNetwork implements Serializable {
                 out.writeObject(this);
             }
         } catch (IOException e) {
+
             e.printStackTrace();
         }
     }

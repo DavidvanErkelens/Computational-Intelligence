@@ -27,10 +27,12 @@ public class DefaultDriverAlgorithm extends AbstractAlgorithm {
             //Start a race
             DefaultRace race = new DefaultRace();
             race.setTrack("aalborg", "road");
-            race.laps = 1;
+            race.laps = 100;
 
-            //for speedup set withGUI to false
-            results = race.runRace(drivers, true);
+            for(int i = 0; i < 500; i++) {
+                //for speedup set withGUI to false
+                results = race.runRace(drivers, true);
+            }
 
             // Save genome/nn
             DriversUtils.storeGenome(drivers[0]);
