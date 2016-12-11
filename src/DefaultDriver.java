@@ -8,18 +8,10 @@ import cicontest.torcs.genome.IGenome;
 import scr.Action;
 import scr.SensorModel;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URL;
-import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Random;
 import java.util.WeakHashMap;
-
-
-
-
 
 public class DefaultDriver extends AbstractDriver {
 
@@ -29,7 +21,6 @@ public class DefaultDriver extends AbstractDriver {
 
     double[] previousState;
     double[] previousAction;
-    double previousScore;
 
     private static final double SAFE_DISTANCE = 120;
 
@@ -179,7 +170,6 @@ public class DefaultDriver extends AbstractDriver {
 
         action.limitValues();
 
-
         return action;
     }
 /*
@@ -187,98 +177,37 @@ public class DefaultDriver extends AbstractDriver {
     public Action defaultControl(Action action, SensorModel sensors) {
         if (action == null) action = new Action();
 
-        final double SPEED_GOAL = 60;
+        final double SPEED_GOAL = 40;
 
         // Get current state
         double[] currentState = getState(sensors);
 
-        // Slow drive
-        if(currentState[26] < 50) {
-            action.accelerate = 0.1;
-        } else {
-            action.accelerate = 0.0;
-        }
-        action.steering = 0.0;
-        action.brake = 0.0;
+        // Get Action
+        double[] currentAction;
+        if (currentState[26] < SPEED_GOAL)
+            currentAction[0] *= 1.5;
+
+//      if(random.nextFloat() > .1) {
+//          currentAction = neuralNetwork.getOutput(sensors);
+//      } else {
+//          currentAction = new double[3];
+//          currentAction[0] = random.nextFloat();
+//          currentAction[1] = random.nextFloat();
+//          currentAction[2] = random.nextFloat();
+//      }
+
+        action.accelerate = currentAction[0];
+        action.steering = currentAction[1];
+        action.brake = currentAction[2];
 
         // Get reward
-        double currentReward = Math.cos(currentState[23]) - Math.sin(currentState[23]) - currentState[24] - sensors.getDamage();
-        if(sensors.getDamage() > 0) {
-            action.restartRace = true;
-        }
-
+        double currentReward = Math.cos(sensors.getAngleToTrackAxis()) - Math.sin(sensors.getAngleToTrackAxis()) - sensors.getTrackPosition();
 
         // Store experience
-        // Experience experience = new Experience(previousState, previousAction, currentReward, currentState, false);
-        // storeExperience(experience);
-        int act_num = 0;
-        if(previousState != null && previousAction != null) {
-            String str_s = "\"[[";
-            String str_a = "\"[" + previousAction[0] + "," + previousAction[1] + "," + previousAction[2] + "," + previousAction[3] + "]\"";
-            String str_r = "" + currentReward;
-            String str_n = "\"[[";
-            str_s += previousState[0];
-            str_n += currentState[0];
-            for (int i = 1; i < previousState.length; i++) {
-                str_s += ", " + previousState[i];
-                str_n += ", " + currentState[i];
-            }
-            str_s += "]]\"";
-            str_n += "]]\"";
-
-
-            try {
-                String charset = "UTF-8";
-                URLConnection connection = new URL("http://localhost:5000/post_experience").openConnection();
-                connection.setDoOutput(true); // Triggers POST.
-                connection.setRequestProperty("Content-Type", "application/json");
-                String param = "{" +
-                        "\"s\": " + str_s + "," +
-                        "\"a\": " + str_a + "," +
-                        "\"r\": " + str_r + "," +
-                        "\"n\": " + str_n + "}";
-
-                connection.setRequestProperty("data", param);
-
-                try (OutputStream output = connection.getOutputStream()) {
-                    output.write(param.getBytes(charset));
-                }
-
-                InputStream response = connection.getInputStream();
-                act_num = response.read() - '0';
-
-            } catch(Exception e) {
-                System.out.println(e);
-            }
-        }
-
-        System.out.println(act_num);
-        switch(act_num) {
-            case 0:
-                action.steering = 0.;
-                break;
-            case 1:
-                action.steering = -1.;
-                break;
-            case 2:
-                action.steering = 1.;
-                break;
-            case 3:
-                action.accelerate = .1;
-                break;
-        }
-
-
-        // Get Action
-        double[] currentAction = new double[4];
-        currentAction[0] = 0.0;
-        currentAction[1] = 0.0;
-        currentAction[2] = 0.0;
-        currentAction[3] = 0.0;
-        currentAction[act_num] = 1.0;
-
-        previousAction = currentAction;
+        Experience experience = new Experience(previousState, previousAction, currentReward, currentState, false);
+        storeExperience(experience);
         previousState = currentState;
+        previousAction = currentAction;
 
         // Print action
         System.out.println("--------------" + getDriverName() + "--------------");
