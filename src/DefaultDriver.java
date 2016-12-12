@@ -77,17 +77,20 @@ public class DefaultDriver extends AbstractDriver {
     public Action defaultControl(Action action, SensorModel sensors) {
         // Set heuristics
         final double MAX_SPEED = dirt ? 60 : 120;
-        final double CORNER_SPEED = dirt ? 40 : 60;
+//        final double CORNER_SPEED = dirt ? 40 : 60;
+        final double CORNER_SPEED = dirt ? 44.87835481 : 72.76438641;
         final double BRAKE_SPEED = dirt ? 45 : 80;
         final double BRAKE_POWER = dirt ? 0.35 : 0.65;
         final double MAX_DIST = 90;
-        final double LONG_DIST = 140;
+//        final double LONG_DIST = 140;
+        final double LONG_DIST = 119.95656808;
         final double OFFTRACK = 0.5;
         final double BRAKE_DIST = 120;
         final double IGNORE_BEAM_DIST = 175;
-        final double MAX_BRAKE_STEER = 0.15;
+//        final double MAX_BRAKE_STEER = 0.15;
+        final double MAX_BRAKE_STEER = 11.81980625;
         final double STEER_BACK_TO_TRACK = 0.3;
-        
+
         // Get sensor data
         double speed = sensors.getSpeed();
         double[] edgeSensors = sensors.getTrackEdgeSensors();
