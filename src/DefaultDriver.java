@@ -2,12 +2,18 @@ import cicontest.algorithm.abstracts.AbstractDriver;
 import cicontest.torcs.controller.extras.ABS;
 import cicontest.torcs.controller.extras.AutomatedClutch;
 import cicontest.torcs.controller.extras.AutomatedGearbox;
+import cicontest.torcs.controller.extras.AutomatedRecovering;
 import cicontest.torcs.genome.IGenome;
 import scr.Action;
 import scr.SensorModel;
 public class DefaultDriver extends AbstractDriver {
 
     private NeuralNetwork neuralNetwork;
+    private boolean brakeTest = false;
+    private boolean brakeTestOngoing = false;
+    private boolean dirt = false;
+    private int ratiodetected = 0;
+    private int rounds = 0;
 
 
     public DefaultDriver() {
@@ -20,6 +26,7 @@ public class DefaultDriver extends AbstractDriver {
         this.enableExtras(new AutomatedClutch());
         this.enableExtras(new AutomatedGearbox());
 //        this.enableExtras(new ABS());
+        this.enableExtras(new AutomatedRecovering());
     }
 
 
@@ -71,18 +78,19 @@ public class DefaultDriver extends AbstractDriver {
     @Override
     public Action defaultControl(Action action, SensorModel sensors) {
         // Set heuristics
-        final double MAX_SPEED = 120;
-        final double CORNER_SPEED = 60;
-        final double MAX_DIST = 75;
-        final double LONG_DIST = 100;
-        final double OFFTRACK = 0.5;
-        final double BRAKE_DIST = 90;
-        final double BRAKE_SPEED = 70;
-        final double BRAKE_POWER = 0.5;
-        final double IGNORE_BEAM_DIST = 90;
-        final double MAX_BRAKE_STEER = 0.35;
-        final double STEER_BACK_TO_TRACK = 0.4;
-
+        final double MAX_SPEED = dirt ? 60 : 120;
+        final double CORNER_SPEED = dirt ? 40 : 60;
+        final double BRAKE_SPEED = dirt ? 45 : 80;
+        final double BRAKE_POWER = dirt ? 0.35 : 0.65;
+        final double MAX_DIST = 90;
+        final double LONG_DIST = 140;
+        final double OFFTRACK = 0.65;
+        final double BRAKE_DIST = 120;
+        final double IGNORE_BEAM_DIST = 175;
+        final double MAX_BRAKE_STEER = 0.15;
+        final double STEER_BACK_TO_TRACK = 0.45;
+        final double DIRT_RATIO_DETECTOR = 6;
+        final double TIMES_ABOVE_RATIO = 15;
         double LOCK = Math.PI * .25;
 
         // Get sensor data
@@ -90,24 +98,33 @@ public class DefaultDriver extends AbstractDriver {
         double[] edgeSensors = sensors.getTrackEdgeSensors();
         double angle = sensors.getAngleToTrackAxis();
         double pos = sensors.getTrackPosition();
+        double[] wheelSpin = sensors.getWheelSpinVelocity();
+        double totalWheelSpin = wheelSpin[2] + wheelSpin[3];
+        double wheelSpinSpeedRatio = totalWheelSpin / speed;
+
+        if (rounds < 100) rounds ++;
+        if (!dirt && rounds < 100 && wheelSpinSpeedRatio > DIRT_RATIO_DETECTOR && ratiodetected++ > TIMES_ABOVE_RATIO) dirt = true;
+
 
         double centerSensor = 0.0;
-        for (int i = 7; i <= 11; i++) centerSensor = Math.max(centerSensor, edgeSensors[i]);
-
+        double minCenter = edgeSensors[7];
+        for (int i = 7; i <= 11; i++) {
+            centerSensor = Math.max(centerSensor, edgeSensors[i]);
+            minCenter = Math.min(minCenter, edgeSensors[i]);
+        }
         int maxdist = 9;
         boolean offtrack = false;
 
         for (int i = 0; i <= 18; i++) {
             if (edgeSensors[i] > IGNORE_BEAM_DIST) continue;
             if (edgeSensors[i] > edgeSensors[maxdist]) maxdist = i;
-            if (edgeSensors[i] <= OFFTRACK) {
+            if (edgeSensors[i] < OFFTRACK) {
                 offtrack = true;
-                break;
             }
         }
 
-        if (offtrack && edgeSensors[0] < OFFTRACK / 2.0) action.steering = -1 * STEER_BACK_TO_TRACK;
-        else if (offtrack && edgeSensors[18] < OFFTRACK / 2.0) action.steering = STEER_BACK_TO_TRACK;
+        if (offtrack && edgeSensors[0] < OFFTRACK) action.steering = -1 * STEER_BACK_TO_TRACK;
+        else if (offtrack && edgeSensors[18] < OFFTRACK) action.steering = STEER_BACK_TO_TRACK;
         else action.steering = (maxdist - 9) / -9.0;
 
 
@@ -115,20 +132,20 @@ public class DefaultDriver extends AbstractDriver {
         double targetSpeed;
         if (centerSensor > MAX_DIST) {
             targetSpeed = MAX_SPEED;
-        } else if (centerSensor < BRAKE_DIST && sensors.getSpeed() > BRAKE_SPEED) {
+        } else if (centerSensor < BRAKE_DIST * (speed / 50.0) && sensors.getSpeed() > BRAKE_SPEED) {
             action.brake = BRAKE_POWER;
             targetSpeed = 0;
             if (Math.abs(action.steering) > MAX_BRAKE_STEER) {
                 if (action.steering < 0) action.steering = -1 * MAX_BRAKE_STEER;
                 else action.steering = MAX_BRAKE_STEER;
             }
-        } else {
+        }
+        else {
             targetSpeed = CORNER_SPEED;
         }
 
-        action.accelerate = 2 / ((1 + Math.exp(speed - targetSpeed)) - 1);
-        if (Math.max(edgeSensors[9], Math.max(edgeSensors[8], edgeSensors[10])) > LONG_DIST && !offtrack)
-            action.accelerate = 1.0;
+        action.accelerate = 2 / ((1 + Math.exp(speed - targetSpeed))) - 1;
+        if (centerSensor > LONG_DIST && !offtrack) action.accelerate = 1.0;
 
         action.limitValues();
 
@@ -203,7 +220,6 @@ public class DefaultDriver extends AbstractDriver {
 //            if (Math.abs(angle) >= Math.PI / 2.0) action.steering *= -1;
 //            action.accelerate = 0.2;
 //            action.gear = 1;
-//
 //        }
 //        action.limitValues();
 //
