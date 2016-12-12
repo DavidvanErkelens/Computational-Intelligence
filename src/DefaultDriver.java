@@ -9,11 +9,9 @@ import scr.SensorModel;
 public class DefaultDriver extends AbstractDriver {
 
     private NeuralNetwork neuralNetwork;
-    private boolean brakeTest = false;
-    private boolean brakeTestOngoing = false;
     private boolean dirt = false;
-    private int ratiodetected = 0;
-    private int rounds = 0;
+    private boolean dirtDetector = false;
+    private double trackTotalWheelSpin = 0.0;
 
 
     public DefaultDriver() {
@@ -25,7 +23,7 @@ public class DefaultDriver extends AbstractDriver {
     private void initialize() {
         this.enableExtras(new AutomatedClutch());
         this.enableExtras(new AutomatedGearbox());
-//        this.enableExtras(new ABS());
+        this.enableExtras(new ABS());
         this.enableExtras(new AutomatedRecovering());
     }
 
@@ -84,27 +82,35 @@ public class DefaultDriver extends AbstractDriver {
         final double BRAKE_POWER = dirt ? 0.35 : 0.65;
         final double MAX_DIST = 90;
         final double LONG_DIST = 140;
-        final double OFFTRACK = 0.65;
+        final double OFFTRACK = 0.5;
         final double BRAKE_DIST = 120;
         final double IGNORE_BEAM_DIST = 175;
         final double MAX_BRAKE_STEER = 0.15;
-        final double STEER_BACK_TO_TRACK = 0.45;
-        final double DIRT_RATIO_DETECTOR = 6;
-        final double TIMES_ABOVE_RATIO = 15;
-        double LOCK = Math.PI * .25;
-
+        final double STEER_BACK_TO_TRACK = 0.3;
+        
         // Get sensor data
         double speed = sensors.getSpeed();
         double[] edgeSensors = sensors.getTrackEdgeSensors();
         double angle = sensors.getAngleToTrackAxis();
         double pos = sensors.getTrackPosition();
         double[] wheelSpin = sensors.getWheelSpinVelocity();
-        double totalWheelSpin = wheelSpin[2] + wheelSpin[3];
+        double totalWheelSpin = Math.abs(wheelSpin[2]) + Math.abs(wheelSpin[3]);
         double wheelSpinSpeedRatio = totalWheelSpin / speed;
+        double laptime = sensors.getCurrentLapTime();
+        int lap = sensors.getLaps();
 
-        if (rounds < 100) rounds ++;
-        if (!dirt && rounds < 100 && wheelSpinSpeedRatio > DIRT_RATIO_DETECTOR && ratiodetected++ > TIMES_ABOVE_RATIO) dirt = true;
+        if (laptime >= 0 && laptime <= 0.5 && lap == 0)
+        {
+            if (!Double.isNaN(wheelSpinSpeedRatio)) trackTotalWheelSpin += wheelSpinSpeedRatio;
+        }
 
+        if (!dirtDetector && laptime > 0.5)
+        {
+            System.out.println("Total ratio: " + trackTotalWheelSpin);
+            dirtDetector = true;
+            dirt = trackTotalWheelSpin >= 200;
+//            if (dirt) System.out.println("Dirt was detected");
+        }
 
         double centerSensor = 0.0;
         double minCenter = edgeSensors[7];
